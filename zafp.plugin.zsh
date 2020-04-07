@@ -76,6 +76,18 @@ _zafp_get_credentials_value() {
   jq --raw-output .$key $_ZAFP_CREDENTIAL_SYNC_FILE
 }
 
+_zafp_hook_precmd() {
+  emulate -L zsh
+  _zafp_update_aws_variables
+  _zafp_update_expiration
+  _zafp_update_prompt
+}
+
+_zapf_hook_zshexit() {
+  emulate -L zsh
+  rm $_ZAFP_CREDENTIAL_SYNC_FILE
+}
+
 _zafp_init_config_variables() {
   emulate -L zsh
 
@@ -93,44 +105,12 @@ _zafp_init_config_variables() {
   done
 }
 
-_zafp_precmd() {
-  emulate -L zsh
-  _zafp_update_aws_variables
-  _zafp_update_expiration
-  _zafp_update_prompt
-}
-
 _zafp_reset_credential_sync_state() {
   emulate -L zsh
-  _zafp_unset_variables $_ZAFP_CREDENTIAL_SYNC_VARIABLES
-  _zafp_reset_file $_ZAFP_CREDENTIAL_SYNC_FILE
-}
-
-_zafp_reset_file() {
-  emulate -L zsh
-  local file=$1
-  printf "" >$file
-}
-
-_zafp_unset_variables() {
-  emulate -L zsh
-  local vars=$1
-  for var in $vars; do
+  for var in $_ZAFP_CREDENTIAL_SYNC_VARIABLES; do
     unset $var
   done
-}
-
-_zafp_update_prompt() {
-  emulate -L zsh
-  if _zafp_credentials_sync_is_running; then
-    if [[ $PROMPT != *$_ZAFP_PROMPT_PREFIX* ]]; then
-      PROMPT=$_ZAFP_PROMPT_PREFIX$PROMPT
-    fi
-  else
-    if [[ $PROMPT == *$_ZAFP_PROMPT_PREFIX* ]]; then
-      PROMPT=${PROMPT//$_ZAFP_PROMPT_PREFIX/}
-    fi
-  fi
+  printf "" >$_ZAFP_CREDENTIAL_SYNC_FILE
 }
 
 _zafp_update_aws_variables() {
@@ -177,9 +157,17 @@ _zafp_update_expiration() {
   fi
 }
 
-_zapf_zshexit() {
+_zafp_update_prompt() {
   emulate -L zsh
-  rm $_ZAFP_CREDENTIAL_SYNC_FILE
+  if _zafp_credentials_sync_is_running; then
+    if [[ $PROMPT != *$_ZAFP_PROMPT_PREFIX* ]]; then
+      PROMPT=$_ZAFP_PROMPT_PREFIX$PROMPT
+    fi
+  else
+    if [[ $PROMPT == *$_ZAFP_PROMPT_PREFIX* ]]; then
+      PROMPT=${PROMPT//$_ZAFP_PROMPT_PREFIX/}
+    fi
+  fi
 }
 
 unzafp() {
@@ -243,5 +231,5 @@ _zafp_init_config_variables
 _zafp_reset_credential_sync_state
 
 autoload -U add-zsh-hook
-add-zsh-hook precmd _zafp_precmd
-add-zsh-hook zshexit _zapf_zshexit
+add-zsh-hook precmd _zafp_hook_precmd
+add-zsh-hook zshexit _zapf_hook_zshexit
