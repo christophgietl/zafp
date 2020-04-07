@@ -5,20 +5,16 @@
 _ZAFP_CONFIG_FILE=$HOME/.zafp.zsh
 _ZAFP_CONFIG_VARIABLES=('_ZAFP_HOST' '_ZAFP_PATH' '_ZAFP_USER' '_ZAFP_DEFAULT_ACCOUNT' '_ZAFP_DEFAULT_ROLE')
 
-_ZAFP_CREDENTIALS_FILE=$(mktemp)
+_ZAFP_CREDENTIAL_SYNC_FILE=$(mktemp)
+_ZAFP_CREDENTIAL_SYNC_VARIABLES=('_zafp_account' '_zafp_expiration' '_zafp_credential_sync_pid' '_zafp_role')
 
 _ZAFP_DEPENDENCIES=('curl' 'date' 'jq' 'mktemp')
 
 # shellcheck disable=SC2016
-_ZAFP_PROMPT_PREFIX='[$_zafp_account/$_zafp_role $_zafp_credentials_expire_in] '
-
-# Global variables used by zafp and _zafp_*:
-_zafp_account=unknown_account
-_zafp_credentials_expire_in=unknown_time_interval
-_zafp_credentials_sync_pid=-1
-_zafp_role=unknown_role
+_ZAFP_PROMPT_PREFIX='[$_zafp_account/$_zafp_role $_zafp_expiration] '
 
 _zafp_check_dependencies() {
+  emulate -L zsh
   for command in $_ZAFP_DEPENDENCIES; do
     if ! type $command >/dev/null; then
       printf "The command %s is not installed. Please install.\n" $command >&2
@@ -27,12 +23,15 @@ _zafp_check_dependencies() {
 }
 
 _zafp_credentials_sync() {
-  local password=$1
+  emulate -L zsh
+  local account=$1
+  local role=$2
+  local password=$3
 
-  local curl_exit_status=0
-  local tmp_output_file
+  local curl_exit_status tmp_output_file url
+  curl_exit_status=0
   tmp_output_file=$(mktemp)
-  local url=https://$_ZAFP_HOST/$_ZAFP_PATH/$_zafp_account/$_zafp_role
+  url=https://$_ZAFP_HOST/$_ZAFP_PATH/$account/$role
 
   while true; do
     curl \
@@ -48,7 +47,7 @@ _zafp_credentials_sync() {
       break
     fi
 
-    mv $tmp_output_file $_ZAFP_CREDENTIALS_FILE
+    mv $tmp_output_file $_ZAFP_CREDENTIAL_SYNC_FILE
 
     sleep 60
   done
@@ -57,31 +56,34 @@ _zafp_credentials_sync() {
   if [[ -w $tmp_output_file ]]; then
     rm $tmp_output_file
   fi
-  _zafp_reset_file $_ZAFP_CREDENTIALS_FILE
+  _zafp_reset_credential_sync_state
   printf "Credentials sync: Stopped.\n"
   return $curl_exit_status
 }
 
 _zafp_credentials_sync_is_running() {
-  if ((_zafp_credentials_sync_pid < 0)); then
-    return 1
+  emulate -L zsh
+  if [[ -v _zafp_credential_sync_pid ]]; then
+    kill -0 $_zafp_credential_sync_pid 2>/dev/null
+    return $?
   fi
-
-  kill -0 $_zafp_credentials_sync_pid 2>/dev/null
-  return $?
+  return 1
 }
 
 _zafp_get_credentials_value() {
+  emulate -L zsh
   local key=$1
-  jq --raw-output .$key $_ZAFP_CREDENTIALS_FILE
+  jq --raw-output .$key $_ZAFP_CREDENTIAL_SYNC_FILE
 }
 
 _zafp_init_config_variables() {
-  if [[ -e $_ZAFP_CONFIG_FILE ]]; then
+  emulate -L zsh
+
+  if [[ -r $_ZAFP_CONFIG_FILE ]]; then
     # shellcheck source=.zafp.zsh.template
     source $_ZAFP_CONFIG_FILE
   else
-    printf "The configuration file %s does not exist. Please create.\n" $_ZAFP_CONFIG_FILE >&2
+    printf "Cannot read configuration file %s. Please create and grant read permissions.\n" $_ZAFP_CONFIG_FILE >&2
   fi
 
   for config_var in $_ZAFP_CONFIG_VARIABLES; do
@@ -92,21 +94,34 @@ _zafp_init_config_variables() {
 }
 
 _zafp_precmd() {
-  _zafp_update_shell_variables
+  emulate -L zsh
+  _zafp_update_aws_variables
+  _zafp_update_expiration
   _zafp_update_prompt
 }
 
+_zafp_reset_credential_sync_state() {
+  emulate -L zsh
+  _zafp_unset_variables $_ZAFP_CREDENTIAL_SYNC_VARIABLES
+  _zafp_reset_file $_ZAFP_CREDENTIAL_SYNC_FILE
+}
+
 _zafp_reset_file() {
+  emulate -L zsh
   local file=$1
   printf "" >$file
 }
 
-_zafp_reset_sync() {
-  _zafp_credentials_sync_pid=-1
-  _zafp_reset_file $_ZAFP_CREDENTIALS_FILE
+_zafp_unset_variables() {
+  emulate -L zsh
+  local vars=$1
+  for var in $vars; do
+    unset $var
+  done
 }
 
 _zafp_update_prompt() {
+  emulate -L zsh
   if _zafp_credentials_sync_is_running; then
     if [[ $PROMPT != *$_ZAFP_PROMPT_PREFIX* ]]; then
       PROMPT=$_ZAFP_PROMPT_PREFIX$PROMPT
@@ -118,7 +133,8 @@ _zafp_update_prompt() {
   fi
 }
 
-_zafp_update_shell_variables() {
+_zafp_update_aws_variables() {
+  emulate -L zsh
   if _zafp_credentials_sync_is_running; then
     AWS_ACCESS_KEY_ID=$(_zafp_get_credentials_value AccessKeyId)
     export AWS_ACCESS_KEY_ID
@@ -131,37 +147,39 @@ _zafp_update_shell_variables() {
 
     AWS_SECURITY_TOKEN=$(_zafp_get_credentials_value Token)
     export AWS_SECURITY_TOKEN
-
-    _zafp_update_shell_variable_zafp_credentials_expire_in
   else
     unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
-    # shellcheck disable=SC2034
-    _zafp_credentials_expire_in=unknown_time_interval
   fi
 }
 
-_zafp_update_shell_variable_zafp_credentials_expire_in() {
-  local date_ expire_at expire_at_iso expire_in_mins expire_in_secs expire_in_statement now
+_zafp_update_expiration() {
+  emulate -L zsh
+  if _zafp_credentials_sync_is_running; then
+    local date_ expire_at expire_at_iso expire_in_mins expire_in_secs expire_in_statement now
 
-  if type gdate >/dev/null; then
-    date_=gdate
+    if type gdate >/dev/null; then
+      date_=gdate
+    else
+      date_="date"
+    fi
+
+    now=$($date_ +%s)
+    expire_at_iso=$(_zafp_get_credentials_value Expiration)
+    expire_at=$($date_ +%s -d $expire_at_iso)
+    ((expire_in_secs = expire_at - now))
+    ((expire_in_mins = expire_in_secs / 60))
+    expire_in_statement=${expire_in_mins}min
+
+    # shellcheck disable=SC2034
+    _zafp_expiration=$expire_in_statement
   else
-    date_="date"
+    unset _zafp_expiration
   fi
-
-  now=$($date_ +%s)
-  expire_at_iso=$(_zafp_get_credentials_value Expiration)
-  expire_at=$($date_ +%s -d $expire_at_iso)
-  ((expire_in_secs = expire_at - now))
-  ((expire_in_mins = expire_in_secs / 60))
-  expire_in_statement=${expire_in_mins}min
-
-  # shellcheck disable=SC2034
-  _zafp_credentials_expire_in=$expire_in_statement
 }
 
 _zapf_zshexit() {
-  rm $_ZAFP_CREDENTIALS_FILE
+  emulate -L zsh
+  rm $_ZAFP_CREDENTIAL_SYNC_FILE
 }
 
 unzafp() {
@@ -172,35 +190,35 @@ unzafp() {
     return 1
   fi
 
-  kill $_zafp_credentials_sync_pid
-  wait $_zafp_credentials_sync_pid
+  kill $_zafp_credential_sync_pid
+  wait $_zafp_credential_sync_pid
 
-  _zafp_reset_sync
+  _zafp_reset_credential_sync_state
 }
 
 zafp() {
   emulate -L zsh
+  local account password role
 
   if _zafp_credentials_sync_is_running; then
     printf "zafp is already running. Use unzafp to stop it.\n"
     return 1
   fi
 
-  _zafp_account=${1-$_ZAFP_DEFAULT_ACCOUNT}
-  _zafp_role=${2-$_ZAFP_DEFAULT_ROLE}
+  account=${1-$_ZAFP_DEFAULT_ACCOUNT}
+  role=${2-$_ZAFP_DEFAULT_ROLE}
 
-  printf "Starting credentials sync for %s/%s using %s ...\n" $_zafp_account $_zafp_role $_ZAFP_HOST
+  printf "Starting credentials sync for %s/%s using %s ...\n" $account $role $_ZAFP_HOST
 
-  local password
+  _zafp_reset_credential_sync_state
+
   read -rs "password?Password:"
   printf "\n"
 
-  _zafp_reset_sync
+  _zafp_credentials_sync $account $role $password &
+  _zafp_credential_sync_pid=$!
 
-  _zafp_credentials_sync $password &
-  _zafp_credentials_sync_pid=$!
-
-  while [ ! -s $_ZAFP_CREDENTIALS_FILE ]; do
+  while [ ! -s $_ZAFP_CREDENTIAL_SYNC_FILE ]; do
     if ! _zafp_credentials_sync_is_running; then
       break
     fi
@@ -210,16 +228,19 @@ zafp() {
   done
 
   if ! _zafp_credentials_sync_is_running; then
-    _zafp_reset_sync
+    _zafp_reset_credential_sync_state
     printf "Failed to start credentials sync.\n"
     return 1
   fi
 
+  _zafp_account=$account
+  _zafp_role=$role
   printf "\nCredentials sync for %s/%s using %s is running.\n" $_zafp_account $_zafp_role $_ZAFP_HOST
 }
 
 _zafp_check_dependencies
 _zafp_init_config_variables
+_zafp_reset_credential_sync_state
 
 autoload -U add-zsh-hook
 add-zsh-hook precmd _zafp_precmd
