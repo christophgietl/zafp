@@ -8,9 +8,13 @@ _ZAFP_CONFIG_VARIABLES=('_ZAFP_HOST' '_ZAFP_PATH' '_ZAFP_USER' '_ZAFP_DEFAULT_AC
 _ZAFP_CREDENTIALS_FILE=$(mktemp)
 
 # shellcheck disable=SC2016
-_ZAFP_PROMPT_PREFIX='[$_zafp_account/$_zafp_role $_zafp_expiration] '
+_ZAFP_PROMPT_PREFIX='[$_zafp_account/$_zafp_role $_zafp_credentials_expire_at] '
 
+# Global variables used by zafp and _zafp_*:
+_zafp_account=unknown_account
+_zafp_credentials_expire_at=unknown_timestamp
 _zafp_credentials_sync_pid=-1
+_zafp_role=unknown_role
 
 _zafp_credentials_sync() {
   local password=$1
@@ -78,7 +82,7 @@ _zafp_init_config_variables() {
 }
 
 _zafp_precmd() {
-  _zafp_update_env_variables
+  _zafp_update_shell_variables
   _zafp_update_prompt
 }
 
@@ -92,7 +96,19 @@ _zafp_reset_sync() {
   _zafp_reset_file $_ZAFP_CREDENTIALS_FILE
 }
 
-_zafp_update_env_variables() {
+_zafp_update_prompt() {
+  if _zafp_credentials_sync_is_running; then
+    if [[ $PROMPT != *$_ZAFP_PROMPT_PREFIX* ]]; then
+      PROMPT=$_ZAFP_PROMPT_PREFIX$PROMPT
+    fi
+  else
+    if [[ $PROMPT == *$_ZAFP_PROMPT_PREFIX* ]]; then
+      PROMPT=${PROMPT//$_ZAFP_PROMPT_PREFIX/}
+    fi
+  fi
+}
+
+_zafp_update_shell_variables() {
   if _zafp_credentials_sync_is_running; then
     AWS_ACCESS_KEY_ID=$(_zafp_get_credentials_value AccessKeyId)
     export AWS_ACCESS_KEY_ID
@@ -107,21 +123,11 @@ _zafp_update_env_variables() {
     export AWS_SECURITY_TOKEN
 
     # shellcheck disable=SC2034
-    _zafp_expiration=$(_zafp_get_credentials_value Expiration)
+    _zafp_credentials_expire_at=$(_zafp_get_credentials_value Expiration)
   else
-    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN _zafp_expiration
-  fi
-}
-
-_zafp_update_prompt() {
-  if _zafp_credentials_sync_is_running; then
-    if [[ $PROMPT != *$_ZAFP_PROMPT_PREFIX* ]]; then
-      PROMPT=$_ZAFP_PROMPT_PREFIX$PROMPT
-    fi
-  else
-    if [[ $PROMPT == *$_ZAFP_PROMPT_PREFIX* ]]; then
-      PROMPT=${PROMPT//$_ZAFP_PROMPT_PREFIX/}
-    fi
+    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+    # shellcheck disable=SC2034
+    _zafp_credentials_expire_at=unknown_timestamp
   fi
 }
 
