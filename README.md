@@ -7,6 +7,12 @@ and by [afp-cli](https://github.com/Scout24/afp-cli).
 
 ## Installation and usage
 
+Make sure you have `curl` and `jq` installed.
+```zsh
+curl --version
+jq --version
+```
+
 Add the following line to your `~/.zshrc`:
 ```zsh
 antigen bundle https://gitlab.build-unite.unite.eu/christoph.gietl/zafp.git
