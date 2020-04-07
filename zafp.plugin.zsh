@@ -15,11 +15,11 @@ _zafp_credentials_sync_pid=-1
 _zafp_credentials_sync() {
   local password=$1
 
-  local tmp_output_file url
-  tmp_output_file=$(mktemp)
-  url=https://$_ZAFP_HOST/$_ZAFP_PATH/$_zafp_account/$_zafp_role
-
   local curl_exit_status=0
+  local tmp_output_file
+  tmp_output_file=$(mktemp)
+  local url=https://$_ZAFP_HOST/$_ZAFP_PATH/$_zafp_account/$_zafp_role
+
   while true; do
     curl \
       --fail \
@@ -125,6 +125,10 @@ _zafp_update_prompt() {
   fi
 }
 
+_zapf_zshexit() {
+  rm $_ZAFP_CREDENTIALS_FILE
+}
+
 unzafp() {
   if ! _zafp_credentials_sync_is_running; then
     printf "zafp is not running. Use zafp to start it.\n"
@@ -186,3 +190,4 @@ _zafp_init_config_variables
 
 autoload -U add-zsh-hook
 add-zsh-hook precmd _zafp_precmd
+add-zsh-hook zshexit _zapf_zshexit
