@@ -136,6 +136,8 @@ _zapf_zshexit() {
 }
 
 unzafp() {
+  emulate -L zsh
+
   if ! _zafp_credentials_sync_is_running; then
     printf "zafp is not running. Use zafp to start it.\n"
     return 1
@@ -148,6 +150,7 @@ unzafp() {
 }
 
 zafp() {
+  emulate -L zsh
   if _zafp_credentials_sync_is_running; then
     printf "zafp is already running. Use unzafp to stop it.\n"
     return 1
