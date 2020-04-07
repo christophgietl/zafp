@@ -13,6 +13,14 @@ curl --version
 jq --version
 ```
 
+If you are on a Mac, make sure that GNU `date` is installed:
+```zsh
+gdate --version
+# The output should look like "date (GNU coreutils) 8.32".
+# If gdate is not installed, you have to install coreutils:
+brew install coreutils
+```
+
 Add the following line to your `~/.zshrc`:
 ```zsh
 antigen bundle https://gitlab.build-unite.unite.eu/christoph.gietl/zafp.git

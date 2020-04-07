@@ -7,14 +7,24 @@ _ZAFP_CONFIG_VARIABLES=('_ZAFP_HOST' '_ZAFP_PATH' '_ZAFP_USER' '_ZAFP_DEFAULT_AC
 
 _ZAFP_CREDENTIALS_FILE=$(mktemp)
 
+_ZAFP_DEPENDENCIES=('curl' 'date' 'jq' 'mktemp')
+
 # shellcheck disable=SC2016
-_ZAFP_PROMPT_PREFIX='[$_zafp_account/$_zafp_role $_zafp_credentials_expire_at] '
+_ZAFP_PROMPT_PREFIX='[$_zafp_account/$_zafp_role $_zafp_credentials_expire_in] '
 
 # Global variables used by zafp and _zafp_*:
 _zafp_account=unknown_account
-_zafp_credentials_expire_at=unknown_timestamp
+_zafp_credentials_expire_in=unknown_time_interval
 _zafp_credentials_sync_pid=-1
 _zafp_role=unknown_role
+
+_zafp_check_dependencies() {
+  for command in $_ZAFP_DEPENDENCIES; do
+    if ! type $command >/dev/null; then
+      printf "The command %s is not installed. Please install.\n" $command >&2
+    fi
+  done
+}
 
 _zafp_credentials_sync() {
   local password=$1
@@ -122,13 +132,32 @@ _zafp_update_shell_variables() {
     AWS_SECURITY_TOKEN=$(_zafp_get_credentials_value Token)
     export AWS_SECURITY_TOKEN
 
-    # shellcheck disable=SC2034
-    _zafp_credentials_expire_at=$(_zafp_get_credentials_value Expiration)
+    _zafp_update_shell_variable_zafp_credentials_expire_in
   else
     unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
     # shellcheck disable=SC2034
-    _zafp_credentials_expire_at=unknown_timestamp
+    _zafp_credentials_expire_in=unknown_time_interval
   fi
+}
+
+_zafp_update_shell_variable_zafp_credentials_expire_in() {
+  local date_ expire_at expire_at_iso expire_in_mins expire_in_secs expire_in_statement now
+
+  if type gdate >/dev/null; then
+    date_=gdate
+  else
+    date_="date"
+  fi
+
+  now=$($date_ +%s)
+  expire_at_iso=$(_zafp_get_credentials_value Expiration)
+  expire_at=$($date_ +%s -d $expire_at_iso)
+  ((expire_in_secs = expire_at - now))
+  ((expire_in_mins = expire_in_secs / 60))
+  expire_in_statement=${expire_in_mins}min
+
+  # shellcheck disable=SC2034
+  _zafp_credentials_expire_in=$expire_in_statement
 }
 
 _zapf_zshexit() {
@@ -189,6 +218,7 @@ zafp() {
   printf "\nCredentials sync for %s/%s using %s is running.\n" $_zafp_account $_zafp_role $_ZAFP_HOST
 }
 
+_zafp_check_dependencies
 _zafp_init_config_variables
 
 autoload -U add-zsh-hook
