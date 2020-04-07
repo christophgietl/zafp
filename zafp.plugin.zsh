@@ -40,9 +40,11 @@ _zafp_credentials_sync() {
   done
 
   printf "Credentials sync: Stopping ...\n"
-  rm tmp_output_file || true
+  if [[ -w $tmp_output_file ]]; then
+    rm $tmp_output_file
+  fi
   _zafp_reset_file $_ZAFP_CREDENTIALS_FILE
-  printf "Credentials sync: Stopped. Press return to continue\n"
+  printf "Credentials sync: Stopped.\n"
   return $curl_exit_status
 }
 
