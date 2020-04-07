@@ -178,12 +178,13 @@ zafp() {
     sleep 1
   done
 
-  if _zafp_credentials_sync_is_running; then
-    printf "\nCredentials sync for %s/%s using %s is running.\n" $_zafp_account $_zafp_role $_ZAFP_HOST
-  else
+  if ! _zafp_credentials_sync_is_running; then
     _zafp_reset_sync
     printf "Failed to start credentials sync.\n"
+    return 1
   fi
+
+  printf "\nCredentials sync for %s/%s using %s is running.\n" $_zafp_account $_zafp_role $_ZAFP_HOST
 }
 
 _zafp_init_config_variables
