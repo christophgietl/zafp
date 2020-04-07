@@ -1,4 +1,4 @@
-# shellcheck shell=ksh
+# shellcheck shell=ksh        # Unfortunately, shellcheck does not support zsh.
 # shellcheck disable=SC2086
 # shellcheck disable=SC2128
 
@@ -153,16 +153,8 @@ zafp() {
     return 1
   fi
 
-  if (($# >= 2)); then
-    _zafp_role=$2
-  else
-    _zafp_role=$_ZAFP_DEFAULT_ROLE
-  fi
-  if (($# >= 1)); then
-    _zafp_account=$1
-  else
-    _zafp_account=$_ZAFP_DEFAULT_ACCOUNT
-  fi
+  _zafp_account=${1-$_ZAFP_DEFAULT_ACCOUNT}
+  _zafp_role=${2-$_ZAFP_DEFAULT_ROLE}
 
   printf "Starting credentials sync for %s/%s using %s ...\n" $_zafp_account $_zafp_role $_ZAFP_HOST
 
