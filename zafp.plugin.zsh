@@ -49,7 +49,7 @@ _zafp_credentials_sync() {
 
     mv $tmp_output_file $_ZAFP_CREDENTIAL_SYNC_FILE
 
-    sleep sleep $(( 9*60 ))
+    sleep $(( 9*60 ))
   done
 
   printf "Credentials sync: Stopping ...\n"
