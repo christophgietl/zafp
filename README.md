@@ -34,18 +34,18 @@ cp .zafp.zsh.template ~/.zafp.zsh
 
 Check if `zafp` and `unzafp` work as intended:
 ```zsh
-# Start `zafp` using the defaults set in `~/.zafp.zsh`:
+# Start zafp using the defaults set in ~/.zafp.zsh:
 zafp
 # Try a few AWS commands:
 aws s3 ls
-# Stop `zafp`:
+# Stop zafp:
 unzafp
-# Start `zafp` using a different account:
+# Start zafp using a different account:
 zafp my-second-account
-# Stop `zafp`:
+# Stop zafp:
 unzafp
-# Start `zafp` using a different role:
+# Start zafp using a different role:
 zafp my-second-account my-second-role
-# Stop `zafp`:
+# Stop zafp:
 unzafp
 ```
