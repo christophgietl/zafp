@@ -1,5 +1,5 @@
-_ZAFP_HOST=afp.intern.mercateo.com
+_ZAFP_HOST=afp.my-company.com
 _ZAFP_PATH=afp-api/latest/account
-_ZAFP_USER=christoph.gietl
-_ZAFP_DEFAULT_ACCOUNT=analytics_playground
-_ZAFP_DEFAULT_ROLE=admin
+_ZAFP_USER=my-user-name
+_ZAFP_DEFAULT_ACCOUNT=my-account
+_ZAFP_DEFAULT_ROLE=my-role

@@ -23,7 +23,7 @@ brew install coreutils
 
 Add the following line to your `~/.zshrc`:
 ```zsh
-antigen bundle https://gitlab.build-unite.unite.eu/christoph.gietl/zafp.git
+antigen bundle christophgietl/zafp --branch=main
 ```
 
 Create a `~/.zafp.zsh` based on `.zafp.zsh.template`:
@@ -41,11 +41,11 @@ aws s3 ls
 # Stop `zafp`:
 unzafp
 # Start `zafp` using a different account:
-zafp analytics-stage01
+zafp my-second-account
 # Stop `zafp`:
 unzafp
 # Start `zafp` using a different role:
-zafp analytics-stage01 readonly
+zafp my-second-account my-second-role
 # Stop `zafp`:
 unzafp
 ```
